@@ -6,14 +6,14 @@ Sub Main()
     End If
 
     ' Step 2:
-    ' SanitizeAll
-    
+    SanitizeAll
     
     ' Step 3:
     ' Compute variance
+    BuildVarianceReport
 End Sub
 
-
+'Import selected files to activeworkbook
 Function Import() As Boolean
     Dim ret As Boolean
     
@@ -32,6 +32,8 @@ Function Import() As Boolean
         Import = False
         Exit Function
     End If
+
+    Import = True
 End Function
 
 
@@ -44,7 +46,6 @@ Function ImportSheetFromFile(ImportSheetId As Integer, Name As String, caption A
     Set activeWorkbook = Application.activeWorkbook
     filter = "Excel files (*.xlsx),*.xlsx"
     selectedFilename = Application.GetOpenFilename(filter, , caption)
-    Debug.Print selectedFilename
     
     If selectedFilename = False Then
         'No file selected
@@ -54,17 +55,14 @@ Function ImportSheetFromFile(ImportSheetId As Integer, Name As String, caption A
     
     'open workbook of selected file
     Set wb = Workbooks.Open(selectedFilename)
-    wb.Sheets(ImportSheetId).Move After:=activeWorkbook.Sheets(activeWorkbook.Sheets.Count)
+    wb.Sheets(ImportSheetId).Move After:=activeWorkbook.Sheets(activeWorkbook.Sheets.count)
     
     ActiveSheet.Name = Name
     ImportSheetFromFile = True
 End Function
 
 
-
-
-
-Sub SanitzeAll()
+Sub SanitizeAll()
     Sheets("Sheet1").Name = "VarianceReport"
     SanitizeInventoryInHand
     SanitizeFirstCountShop
@@ -123,7 +121,6 @@ Function ColLetter(col As Long) As String
 End Function
 
 
-
 'Retrieve last line number in a given column number
 '
 'col : the colunm number e.g 2
@@ -133,6 +130,34 @@ Function NbOfLinesInCol(col As Long) As Long
     Dim lastLine As Long
     
     descColLetter = ColLetter(col)
-    lastLine = Range(descColLetter & Rows.Count).End(xlUp).Row
+    lastLine = Range(descColLetter & Rows.count).End(xlUp).Row
     NbOfLinesInCol = lastLine
 End Function
+
+
+'import data from InventoryOnHand to VarianceReport
+'
+'UPC code
+'display name
+'price
+'value
+'qty
+Sub BuildVarianceReport()
+    Dim codeColID, descColID, priceColID, valueColID, qtyColID As String
+    Dim inventoryWS, vReportWS As Worksheet
+   
+    codeColID = "B"
+    desColID = "C"
+    priceColID = "F"
+    valueColID = "G"
+    qtyColID = "H"
+    
+    Set inventoryWS = Sheets("InventoryOnHand")
+    Set vReportWS = Sheets("VarianceReport")
+    'Copy selected columns to VarianceReport Sheet
+    inventoryWS.Columns(codeColID).Copy Destination:=vReportWS.Columns("A")
+    inventoryWS.Columns(desColID).Copy Destination:=vReportWS.Columns("B")
+    inventoryWS.Columns(priceColID).Copy Destination:=vReportWS.Columns("C")
+    inventoryWS.Columns(valueColID).Copy Destination:=vReportWS.Columns("D")
+    inventoryWS.Columns(qtyColID).Copy Destination:=vReportWS.Columns("E")
+End Sub
