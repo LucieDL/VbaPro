@@ -4,9 +4,13 @@ Sub Main()
     If Import = False Then
         Exit Sub
     End If
+    
+    Debug.Print "Import OK"
 
     ' Step 2:
     SanitizeAll
+    
+    Debug.Print "Sanitize OK"
     
     ' Step 3:
     ' Compute variance
@@ -32,7 +36,7 @@ Function Import() As Boolean
         Import = False
         Exit Function
     End If
-
+    
     Import = True
 End Function
 
@@ -85,55 +89,90 @@ Sub SanitizeInventoryInHand()
 End Sub
 
 
-'Swap cells content if content is not numeric for a given column
+
+' Todo : Add a general descriptop,
+'
+'
+'
 Sub SanitizeFirstCountShop()
-    Dim i, lastLine As Long
-    Dim upc, desc As Long
-    Dim firstCountShopWS As Worksheet
-    
-    Set firstCountShopWS = Sheets("FirstCountShop")
-    
-    desc = 3
-    upc = 2
-    
-    lastLine = NbOfLinesInCol(desc)
-    
-    For i = 1 To lastLine
-        If Not IsNumeric(firstCountShopWS.Cells(i, upc)) Then
-            ' Swap cells content
-            Dim temp
-            temp = firstCountShopWS.Cells(i, desc).Value
-            firstCountShopWS.Cells(i, desc) = firstCountShopWS.Cells(i, upc)
-            firstCountShopWS.Cells(i, upc) = temp
+    Dim firstShopWS As Worksheet
+    Dim codeColID, qtyColId As Integer
+    Dim items As Collection
+    Dim code As Long
+    Dim codeKey As String
+
+    codeColID = 2
+    qtyColId = 5
+
+    Set firstShopWS = Sheets("FirstCountShop")
+    Set items = GetItemsCollection
+
+    For r = firstShopWS.UsedRange.Rows.count To 2 Step -1
+        code = firstShopWS.Cells(r, codeColID)
+        codeKey = CStr(code)
+        If Contains(items, codeKey) Then
+            firstShopWS.Cells(r, qtyColId).Value = items(codeKey)
+            items.Remove codeKey
+        Else
+            ' We already processed this guy, removing this line
+            firstShopWS.Rows(r).EntireRow.Delete
         End If
     Next
 End Sub
 
 
-'Retrieve the letter associated to a column number
+' Todo : Add a general description
 '
-'col : the colunm number e.g 2
-'return : the letter associated to the column number e.g "B"
-Function ColLetter(col As Long) As String
-    Dim vArr
-    vArr = Split(Cells(1, col).Address(True, False), "$")
-    ColLetter = vArr(0)
-End Function
-
-
-'Retrieve last line number in a given column number
 '
-'col : the colunm number e.g 2
-'return : last "non empty" line number
-Function NbOfLinesInCol(col As Long) As Long
-    Dim descColLetter As String
-    Dim lastLine As Long
+'
+Function GetItemsCollection() As Collection
+    Dim firstShopWS As Worksheet
+    Dim items As Collection
+    Dim codeColID, descColID, qtyColId As Integer
+    Dim code, qty As Long
+    Dim codeKey As String
     
-    descColLetter = ColLetter(col)
-    lastLine = Range(descColLetter & Rows.count).End(xlUp).Row
-    NbOfLinesInCol = lastLine
+    codeColID = 2
+    descColID = 3
+    qtyColId = 5
+
+    Set items = New Collection
+    Set firstShopWS = Sheets("FirstCountShop")
+    For r = 2 To firstShopWS.UsedRange.Rows.count
+        If Not IsNumeric(firstShopWS.Cells(r, codeColID)) Then
+            ' Code is at desc position!
+            code = firstShopWS.Cells(r, descColID).Value
+            ' Swapping
+            firstShopWS.Cells(r, descColID).Value = firstShopWS.Cells(r, codeColID).Value
+            firstShopWS.Cells(r, codeColID).Value = code
+        Else
+            code = firstShopWS.Cells(r, codeColID).Value
+        End If
+        codeKey = CStr(code)
+        qty = firstShopWS.Cells(r, qtyColId).Value
+
+        If Contains(items, codeKey) Then
+            ' Update qty for this code
+            Dim tmp As Long
+            tmp = items(codeKey)
+            items.Remove (codeKey)
+            items.Add qty + tmp, codeKey
+        Else
+            ' new item adding it to the collection
+            items.Add qty, codeKey
+        End If
+    Next
+    Set GetItemsCollection = items
 End Function
 
+
+ 
+Public Function Contains(col As Collection, key As Variant) As Boolean
+    On Error Resume Next
+    col (key) ' Just try it. If it fails, Err.Number will be nonzero.
+    Contains = (Err.Number = 0)
+    Err.Clear
+End Function
 
 'import data from InventoryOnHand to VarianceReport
 '
@@ -143,21 +182,59 @@ End Function
 'value
 'qty
 Sub BuildVarianceReport()
-    Dim codeColID, descColID, priceColID, valueColID, qtyColID As String
+    Dim codeColID, internalColId, descColID, priceColID, valueColID, qtyColId As String
     Dim inventoryWS, vReportWS As Worksheet
    
-    codeColID = "B"
+    codeColID = "A"
+    internalColId = "B"
     desColID = "C"
     priceColID = "F"
     valueColID = "G"
-    qtyColID = "H"
+    qtyColId = "H"
     
     Set inventoryWS = Sheets("InventoryOnHand")
     Set vReportWS = Sheets("VarianceReport")
     'Copy selected columns to VarianceReport Sheet
     inventoryWS.Columns(codeColID).Copy Destination:=vReportWS.Columns("A")
-    inventoryWS.Columns(desColID).Copy Destination:=vReportWS.Columns("B")
-    inventoryWS.Columns(priceColID).Copy Destination:=vReportWS.Columns("C")
-    inventoryWS.Columns(valueColID).Copy Destination:=vReportWS.Columns("D")
-    inventoryWS.Columns(qtyColID).Copy Destination:=vReportWS.Columns("E")
+    inventoryWS.Columns(internalColId).Copy Destination:=vReportWS.Columns("B")
+    inventoryWS.Columns(desColID).Copy Destination:=vReportWS.Columns("C")
+    inventoryWS.Columns(priceColID).Copy Destination:=vReportWS.Columns("D")
+    inventoryWS.Columns(valueColID).Copy Destination:=vReportWS.Columns("E")
+    inventoryWS.Columns(qtyColId).Copy Destination:=vReportWS.Columns("F")
+    vReportWS.Range("G1").Value = "Inv On Shop"
+    vReportWS.Range("H1").Value = "Variance"
+    
+    CreateVLookup
+    ComputeVarianceValue
+    
+    ' Now, resize columns
+    For c = 1 To vReportWS.UsedRange.Columns.count
+        vReportWS.Columns(c).AutoFit
+    Next
+End Sub
+
+
+Sub CreateVLookup()
+    Dim firstShopWS, vReportWS As Worksheet
+    
+    Set firstShopWS = Sheets("FirstCountShop")
+    Set vReportWS = Sheets("VarianceReport")
+    
+    lookupFormula = "VLOOKUP(RC[-6], 'FirstCountShop'!R2C2:R500C5, 4, False)"
+    errorMsg = "Not Found"
+    For r = 2 To vReportWS.UsedRange.Rows.count
+        form = "=IFERROR(" & lookupFormula & "," & Chr(34) & errorMsg & Chr(34) & ")"
+        vReportWS.Cells(r, 7).FormulaR1C1 = form
+    Next
+End Sub
+
+
+Sub ComputeVarianceValue()
+    Dim vReportWS As Worksheet
+    
+    Set vReportWS = Sheets("VarianceReport")
+    
+    For r = 2 To vReportWS.UsedRange.Rows.count
+        vReportWS.Cells(r, 8).FormulaR1C1 = "=(RC[-1] - RC[-2])"
+    Next
 End Sub
