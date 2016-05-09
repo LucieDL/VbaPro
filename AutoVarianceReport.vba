@@ -1,4 +1,14 @@
 Sub Main()
+
+
+    If SheetExists("VarianceReport") Then
+        If MsgBox("Delete current report and create a new one?", vbYesNo, "Confirm") = vbYes Then
+            Reset
+        Else 'user selected No, do nothing
+            Exit Sub
+        End If
+    End If
+
     ' Step 1:
     '  import FirstCountFile and InventoryOnHand
     If Import = False Then
@@ -42,7 +52,7 @@ End Function
 
 
 
-Function ImportSheetFromFile(ImportSheetId As Integer, Name As String, caption As String) As Boolean
+Function ImportSheetFromFile(ImportSheetId As Integer, name As String, caption As String) As Boolean
     Dim wb, activeWorkbook As Workbook
     Dim filter As String
     Dim selectedFilename As Variant
@@ -61,13 +71,13 @@ Function ImportSheetFromFile(ImportSheetId As Integer, Name As String, caption A
     Set wb = Workbooks.Open(selectedFilename)
     wb.Sheets(ImportSheetId).Move After:=activeWorkbook.Sheets(activeWorkbook.Sheets.count)
     
-    ActiveSheet.Name = Name
+    ActiveSheet.name = name
     ImportSheetFromFile = True
 End Function
 
 
 Sub SanitizeAll()
-    Sheets("Sheet1").Name = "VarianceReport"
+    Sheets("Sheet1").name = "VarianceReport"
     SanitizeInventoryInHand
     SanitizeFirstCountShop
 End Sub
@@ -207,10 +217,24 @@ Sub BuildVarianceReport()
     CreateVLookup
     ComputeVarianceValue
     
-    ' Now, resize columns
+    
+    ' Apply filter
+    vReportWS.AutoFilterMode = False
+    vReportWS.Range("A:H").AutoFilter Field:=8, Criteria1:="<>0", VisibleDropDown:=True
+    
+    ' Now, resize columns to AutoFit size
     For c = 1 To vReportWS.UsedRange.Columns.count
         vReportWS.Columns(c).AutoFit
     Next
+    
+    ' Apply Conditional Color
+    With vReportWS.Range(vReportWS.Range("H2"), vReportWS.Range("H2").End(xlDown))
+        .FormatConditions.Delete
+        .FormatConditions.Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=0"
+        .FormatConditions(1).Interior.ColorIndex = 6
+    End With
+    
+    vReportWS.Activate
 End Sub
 
 
@@ -238,3 +262,28 @@ Sub ComputeVarianceValue()
         vReportWS.Cells(r, 8).FormulaR1C1 = "=(RC[-1] - RC[-2])"
     Next
 End Sub
+
+
+
+Sub Reset()
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    ThisWorkbook.Sheets("FirstCountShop").Delete
+    ThisWorkbook.Sheets("InventoryOnHand").Delete
+    ThisWorkbook.Sheets("VarianceReport").AutoFilterMode = False
+    ThisWorkbook.Sheets("VarianceReport").UsedRange.ClearContents
+    ThisWorkbook.Sheets("VarianceReport").name = "Sheet1"
+    Application.DisplayAlerts = True
+    On Error GoTo 0
+End Sub
+
+
+Function SheetExists(name As String) As Boolean
+  SheetExists = False
+  For Each WS In Worksheets
+    If name = WS.name Then
+      SheetExists = True
+      Exit Function
+    End If
+  Next WS
+End Function
