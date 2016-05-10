@@ -1,7 +1,81 @@
+' Todo comment this
+'
+'
+Type InventoryOnHandInfo
+    name As String
+    codeColID As Integer
+    internalColId As Integer
+    desColID As Integer
+    priceColID As Integer
+    valueColID As Integer
+    qtyColId As Integer
+End Type
+
+' Todo comment this
+'
+'
+Type firstCountShopInfo
+    name As String
+    codeColID As Integer
+    descColID As Integer
+    qtyColId As Integer
+End Type
+
+' Todo comment this
+'
+'
+Type VarianceReportInfo
+    name As String
+    codeColID As Integer
+    internalColId As Integer
+    desColID As Integer
+    priceColID As Integer
+    valueColID As Integer
+    qtyColId As Integer
+    invOnShopColId As Integer
+    varianceColId As Integer
+End Type
+
+
+Public iohInfo As InventoryOnHandInfo
+Public fcsInfo As firstCountShopInfo
+Public vrInfo As VarianceReportInfo
+
+
+' Intialize global variable info
+'
+' This Mapping helps to refactor easly in case file format changes.
+Sub InitizaliteInfos()
+    iohInfo.name = "InventoryOnHand"
+    iohInfo.codeColID = 1
+    iohInfo.internalColId = 2
+    iohInfo.desColID = 3
+    iohInfo.priceColID = 6
+    iohInfo.valueColID = 7
+    iohInfo.qtyColId = 8
+
+    
+    fcsInfo.name = "FirstCountShop"
+    fcsInfo.codeColID = 2
+    fcsInfo.descColID = 3
+    fcsInfo.qtyColId = 5
+    
+    vrInfo.name = "VarianceReport"
+    vrInfo.codeColID = 1
+    vrInfo.internalColId = 2
+    vrInfo.desColID = 3
+    vrInfo.priceColID = 4
+    vrInfo.valueColID = 5
+    vrInfo.qtyColId = 6
+    vrInfo.invOnShopColId = 7
+    vrInfo.varianceColId = 8
+End Sub
+
+
 Sub Main()
-
-
-    If SheetExists("VarianceReport") Then
+    InitizaliteInfos
+    
+    If SheetExists(vrInfo.name) Then
         If MsgBox("Delete current report and create a new one?", vbYesNo, "Confirm") = vbYes Then
             Reset
         Else 'user selected No, do nothing
@@ -31,7 +105,7 @@ End Sub
 Function Import() As Boolean
     Dim ret As Boolean
     
-    ret = ImportSheetFromFile(1, "FirstCountShop", "Select Shop file")
+    ret = ImportSheetFromFile(1, fcsInfo.name, "Select Shop file")
 
     If ret = False Then
         'import of first count shop failed
@@ -39,7 +113,7 @@ Function Import() As Boolean
         Exit Function
     End If
     
-    ret = ImportSheetFromFile(1, "InventoryOnHand", "Select InventoryOnHand")
+    ret = ImportSheetFromFile(1, iohInfo.name, "Select InventoryOnHand")
 
     If ret = False Then
         'import of InventoryOnHand failed
@@ -77,7 +151,7 @@ End Function
 
 
 Sub SanitizeAll()
-    Sheets("Sheet1").name = "VarianceReport"
+    Sheets("Sheet1").name = vrInfo.name
     SanitizeInventoryInHand
     SanitizeFirstCountShop
 End Sub
@@ -95,7 +169,7 @@ End Sub
 ' Options: Show Zeros
 ' ==========================================================
 Sub SanitizeInventoryInHand()
-    Sheets("InventoryOnHand").Range("1:6").Delete
+    Sheets(iohInfo.name).Range("1:6").Delete
 End Sub
 
 
@@ -111,10 +185,10 @@ Sub SanitizeFirstCountShop()
     Dim code As Long
     Dim codeKey As String
 
-    codeColID = 2
-    qtyColId = 5
+    codeColID = fcsInfo.codeColID
+    qtyColId = fcsInfo.qtyColId
 
-    Set firstShopWS = Sheets("FirstCountShop")
+    Set firstShopWS = Sheets(fcsInfo.name)
     Set items = GetItemsCollection
 
     For r = firstShopWS.UsedRange.Rows.count To 2 Step -1
@@ -142,12 +216,12 @@ Function GetItemsCollection() As Collection
     Dim code, qty As Long
     Dim codeKey As String
     
-    codeColID = 2
-    descColID = 3
-    qtyColId = 5
+    codeColID = fcsInfo.codeColID
+    descColID = fcsInfo.descColID
+    qtyColId = fcsInfo.qtyColId
 
     Set items = New Collection
-    Set firstShopWS = Sheets("FirstCountShop")
+    Set firstShopWS = Sheets(fcsInfo.name)
     For r = 2 To firstShopWS.UsedRange.Rows.count
         If Not IsNumeric(firstShopWS.Cells(r, codeColID)) Then
             ' Code is at desc position!
@@ -192,59 +266,52 @@ End Function
 'value
 'qty
 Sub BuildVarianceReport()
-    Dim codeColID, internalColId, descColID, priceColID, valueColID, qtyColId As String
     Dim inventoryWS, vReportWS As Worksheet
-   
-    codeColID = "A"
-    internalColId = "B"
-    desColID = "C"
-    priceColID = "F"
-    valueColID = "G"
-    qtyColId = "H"
     
-    Set inventoryWS = Sheets("InventoryOnHand")
-    Set vReportWS = Sheets("VarianceReport")
+    Set inventoryWS = Sheets(iohInfo.name)
+    Set vReportWS = Sheets(vrInfo.name)
     'Copy selected columns to VarianceReport Sheet
-    inventoryWS.Columns(codeColID).Copy Destination:=vReportWS.Columns("A")
-    inventoryWS.Columns(internalColId).Copy Destination:=vReportWS.Columns("B")
-    inventoryWS.Columns(desColID).Copy Destination:=vReportWS.Columns("C")
-    inventoryWS.Columns(priceColID).Copy Destination:=vReportWS.Columns("D")
-    inventoryWS.Columns(valueColID).Copy Destination:=vReportWS.Columns("E")
-    inventoryWS.Columns(qtyColId).Copy Destination:=vReportWS.Columns("F")
-    vReportWS.Range("G1").Value = "Inv On Shop"
-    vReportWS.Range("H1").Value = "Variance"
+    inventoryWS.Columns(iohInfo.codeColID).Copy Destination:=vReportWS.Columns(vrInfo.codeColID)
+    inventoryWS.Columns(iohInfo.internalColId).Copy Destination:=vReportWS.Columns(vrInfo.internalColId)
+    inventoryWS.Columns(iohInfo.desColID).Copy Destination:=vReportWS.Columns(vrInfo.desColID)
+    inventoryWS.Columns(iohInfo.priceColID).Copy Destination:=vReportWS.Columns(vrInfo.priceColID)
+    inventoryWS.Columns(iohInfo.valueColID).Copy Destination:=vReportWS.Columns(vrInfo.valueColID)
+    inventoryWS.Columns(iohInfo.qtyColId).Copy Destination:=vReportWS.Columns(vrInfo.qtyColId)
+
+    vReportWS.Cells(1, vrInfo.invOnShopColId).Value = "Inv On Shop"
+    vReportWS.Cells(1, vrInfo.varianceColId).Value = "Variance"
     
     CreateVLookup
     ComputeVarianceValue
-    
     
     ' Apply filter
     vReportWS.AutoFilterMode = False
     vReportWS.Range("A:H").AutoFilter Field:=8, Criteria1:="<>0", VisibleDropDown:=True
     
     ' Now, resize columns to AutoFit size
-    For c = 1 To vReportWS.UsedRange.Columns.count
-        vReportWS.Columns(c).AutoFit
+    For C = 1 To vReportWS.UsedRange.Columns.count
+        vReportWS.Columns(C).AutoFit
     Next
     
-    ' Apply Conditional Color
-    With vReportWS.Range(vReportWS.Range("H2"), vReportWS.Range("H2").End(xlDown))
+    With vReportWS.Range(vReportWS.Cells(2, vrInfo.varianceColId), vReportWS.Cells(2, vrInfo.varianceColId).End(xlDown))
         .FormatConditions.Delete
         .FormatConditions.Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=0"
         .FormatConditions(1).Interior.ColorIndex = 6
     End With
-    
+
     vReportWS.Activate
 End Sub
 
 
 Sub CreateVLookup()
     Dim firstShopWS, vReportWS As Worksheet
+    Dim nbRowsInFsc As Integer
     
-    Set firstShopWS = Sheets("FirstCountShop")
-    Set vReportWS = Sheets("VarianceReport")
+    Set firstShopWS = Sheets(fcsInfo.name)
+    Set vReportWS = Sheets(vrInfo.name)
     
-    lookupFormula = "VLOOKUP(RC[-6], 'FirstCountShop'!R2C2:R500C5, 4, False)"
+    nbRowsInFsc = firstShopWS.UsedRange.Rows.count + 50  'add margin
+    lookupFormula = "VLOOKUP(RC[-6]," & fcsInfo.name & "!R2C2:R" & nbRowsInFsc & "C5, 4, False)"
     errorMsg = "Not Found"
     For r = 2 To vReportWS.UsedRange.Rows.count
         form = "=IFERROR(" & lookupFormula & "," & Chr(34) & errorMsg & Chr(34) & ")"
@@ -256,10 +323,10 @@ End Sub
 Sub ComputeVarianceValue()
     Dim vReportWS As Worksheet
     
-    Set vReportWS = Sheets("VarianceReport")
+    Set vReportWS = Sheets(vrInfo.name)
     
     For r = 2 To vReportWS.UsedRange.Rows.count
-        vReportWS.Cells(r, 8).FormulaR1C1 = "=(RC[-1] - RC[-2])"
+        vReportWS.Cells(r, vrInfo.varianceColId).FormulaR1C1 = "=(RC[-1] - RC[-2])"
     Next
 End Sub
 
@@ -268,11 +335,11 @@ End Sub
 Sub Reset()
     Application.DisplayAlerts = False
     On Error Resume Next
-    ThisWorkbook.Sheets("FirstCountShop").Delete
-    ThisWorkbook.Sheets("InventoryOnHand").Delete
-    ThisWorkbook.Sheets("VarianceReport").AutoFilterMode = False
-    ThisWorkbook.Sheets("VarianceReport").UsedRange.ClearContents
-    ThisWorkbook.Sheets("VarianceReport").name = "Sheet1"
+    ThisWorkbook.Sheets(fcsInfo.name).Delete
+    ThisWorkbook.Sheets(iohInfo.name).Delete
+    ThisWorkbook.Sheets(vrInfo.name).AutoFilterMode = False
+    ThisWorkbook.Sheets(vrInfo.name).UsedRange.ClearContents
+    ThisWorkbook.Sheets(vrInfo.name).name = "Sheet1"
     Application.DisplayAlerts = True
     On Error GoTo 0
 End Sub
