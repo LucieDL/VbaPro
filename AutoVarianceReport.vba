@@ -162,7 +162,6 @@ End Function
 
 ' Todo : Add a description
 '
-'
 Sub SanitizeAll()
     Sheets("Sheet1").name = vrInfo.name
     SanitizeInventoryInHand
@@ -188,7 +187,6 @@ End Sub
 
 
 ' Todo : Add a description
-'
 '
 Sub SanitizeFirstCountShop()
     Dim firstShopWS As Worksheet
@@ -370,4 +368,3 @@ Function SheetExists(name As String) As Boolean
     End If
   Next WS
 End Function
-
