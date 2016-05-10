@@ -1,5 +1,13 @@
-' Todo comment this
+''
+' Help to compute the variance from first count shop and Inventory
+' On Hand data
 '
+' The main function here is Main (the entry point)
+'
+
+
+
+' Information related to InventoryOnHand file layout
 '
 Type InventoryOnHandInfo
     name As String
@@ -11,8 +19,7 @@ Type InventoryOnHandInfo
     qtyColId As Integer
 End Type
 
-' Todo comment this
-'
+' Information related to first cunt shop file layout
 '
 Type firstCountShopInfo
     name As String
@@ -21,8 +28,7 @@ Type firstCountShopInfo
     qtyColId As Integer
 End Type
 
-' Todo comment this
-'
+' Information related to first cunt shop file layout
 '
 Type VarianceReportInfo
     name As String
@@ -53,7 +59,6 @@ Sub InitizaliteInfos()
     iohInfo.priceColID = 6
     iohInfo.valueColID = 7
     iohInfo.qtyColId = 8
-
     
     fcsInfo.name = "FirstCountShop"
     fcsInfo.codeColID = 2
@@ -71,14 +76,16 @@ Sub InitizaliteInfos()
     vrInfo.varianceColId = 8
 End Sub
 
-
+' Entry point
+' Select this function as the Macro entry point
+'
 Sub Main()
     InitizaliteInfos
     
     If SheetExists(vrInfo.name) Then
         If MsgBox("Delete current report and create a new one?", vbYesNo, "Confirm") = vbYes Then
             Reset
-        Else 'user selected No, do nothing
+        Else ' user selected No, do nothing
             Exit Sub
         End If
     End If
@@ -101,14 +108,16 @@ Sub Main()
     BuildVarianceReport
 End Sub
 
-'Import selected files to activeworkbook
+
+' Import selected files to activeworkbook
+'
 Function Import() As Boolean
     Dim ret As Boolean
     
     ret = ImportSheetFromFile(1, fcsInfo.name, "Select Shop file")
 
     If ret = False Then
-        'import of first count shop failed
+        ' import of first count shop failed
         Import = False
         Exit Function
     End If
@@ -116,7 +125,7 @@ Function Import() As Boolean
     ret = ImportSheetFromFile(1, iohInfo.name, "Select InventoryOnHand")
 
     If ret = False Then
-        'import of InventoryOnHand failed
+        ' import of InventoryOnHand failed
         Import = False
         Exit Function
     End If
@@ -125,7 +134,8 @@ Function Import() As Boolean
 End Function
 
 
-
+' Todo : Add a description
+'
 Function ImportSheetFromFile(ImportSheetId As Integer, name As String, caption As String) As Boolean
     Dim wb, activeWorkbook As Workbook
     Dim filter As String
@@ -136,12 +146,12 @@ Function ImportSheetFromFile(ImportSheetId As Integer, name As String, caption A
     selectedFilename = Application.GetOpenFilename(filter, , caption)
     
     If selectedFilename = False Then
-        'No file selected
+        ' No file selected
         ImportSheetFromFile = False
         Exit Function
     End If
     
-    'open workbook of selected file
+    ' open workbook of selected file
     Set wb = Workbooks.Open(selectedFilename)
     wb.Sheets(ImportSheetId).Move After:=activeWorkbook.Sheets(activeWorkbook.Sheets.count)
     
@@ -150,6 +160,9 @@ Function ImportSheetFromFile(ImportSheetId As Integer, name As String, caption A
 End Function
 
 
+' Todo : Add a description
+'
+'
 Sub SanitizeAll()
     Sheets("Sheet1").name = vrInfo.name
     SanitizeInventoryInHand
@@ -174,8 +187,7 @@ End Sub
 
 
 
-' Todo : Add a general descriptop,
-'
+' Todo : Add a description
 '
 '
 Sub SanitizeFirstCountShop()
@@ -205,9 +217,8 @@ Sub SanitizeFirstCountShop()
 End Sub
 
 
-' Todo : Add a general description
-'
-'
+' Creates a collection that contains every information required to
+' sanitize the original file
 '
 Function GetItemsCollection() As Collection
     Dim firstShopWS As Worksheet
@@ -250,7 +261,8 @@ Function GetItemsCollection() As Collection
 End Function
 
 
- 
+' Todo : Add a description
+'
 Public Function Contains(col As Collection, key As Variant) As Boolean
     On Error Resume Next
     col (key) ' Just try it. If it fails, Err.Number will be nonzero.
@@ -258,19 +270,15 @@ Public Function Contains(col As Collection, key As Variant) As Boolean
     Err.Clear
 End Function
 
-'import data from InventoryOnHand to VarianceReport
+
+' import data from InventoryOnHand to VarianceReport
 '
-'UPC code
-'display name
-'price
-'value
-'qty
 Sub BuildVarianceReport()
     Dim inventoryWS, vReportWS As Worksheet
     
     Set inventoryWS = Sheets(iohInfo.name)
     Set vReportWS = Sheets(vrInfo.name)
-    'Copy selected columns to VarianceReport Sheet
+    ' Copy selected columns to VarianceReport Sheet
     inventoryWS.Columns(iohInfo.codeColID).Copy Destination:=vReportWS.Columns(vrInfo.codeColID)
     inventoryWS.Columns(iohInfo.internalColId).Copy Destination:=vReportWS.Columns(vrInfo.internalColId)
     inventoryWS.Columns(iohInfo.desColID).Copy Destination:=vReportWS.Columns(vrInfo.desColID)
@@ -303,6 +311,8 @@ Sub BuildVarianceReport()
 End Sub
 
 
+' Create the VLookup to retrieve information from the first count shop
+'
 Sub CreateVLookup()
     Dim firstShopWS, vReportWS As Worksheet
     Dim nbRowsInFsc As Integer
@@ -315,11 +325,13 @@ Sub CreateVLookup()
     errorMsg = "Not Found"
     For r = 2 To vReportWS.UsedRange.Rows.count
         form = "=IFERROR(" & lookupFormula & "," & Chr(34) & errorMsg & Chr(34) & ")"
-        vReportWS.Cells(r, 7).FormulaR1C1 = form
+        vReportWS.Cells(r, vrInfo.invOnShopColId).FormulaR1C1 = form
     Next
 End Sub
 
 
+' Todo : Add a description
+'
 Sub ComputeVarianceValue()
     Dim vReportWS As Worksheet
     
@@ -331,7 +343,9 @@ Sub ComputeVarianceValue()
 End Sub
 
 
-
+' Reset the file to its original point
+' Clear everything, leave a "Sheet1"
+'
 Sub Reset()
     Application.DisplayAlerts = False
     On Error Resume Next
@@ -345,6 +359,8 @@ Sub Reset()
 End Sub
 
 
+' Check if a sheet exists according to its name
+'
 Function SheetExists(name As String) As Boolean
   SheetExists = False
   For Each WS In Worksheets
@@ -354,3 +370,4 @@ Function SheetExists(name As String) As Boolean
     End If
   Next WS
 End Function
+
