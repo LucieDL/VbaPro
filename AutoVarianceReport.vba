@@ -28,24 +28,39 @@ Type firstCountShopInfo
     qtyColId As Integer
 End Type
 
-' Information related to first cunt shop file layout
+' Information related to first count shop file layout
 '
 Type VarianceReportInfo
     name As String
+    
     codeColID As Integer
-    internalColId As Integer
+    'internalColId As Integer
     desColID As Integer
-    priceColID As Integer
-    valueColID As Integer
+    itemColId As Integer
+    'priceColID As Integer
+    'valueColID As Integer
     qtyColId As Integer
     invOnShopColId As Integer
     varianceColId As Integer
+    reCountColId As Integer
+End Type
+
+' Information related to master file layout
+'
+Type MasterFileInfo
+    name As String
+    codeColID As Integer
+    desColID As Integer
+    priceColID As Integer
+    qtyColId As Integer
+    locationColId As Integer
 End Type
 
 
 Public iohInfo As InventoryOnHandInfo
 Public fcsInfo As firstCountShopInfo
 Public vrInfo As VarianceReportInfo
+Public mfInfo As MasterFileInfo
 
 
 ' Intialize global variable info
@@ -67,13 +82,20 @@ Sub InitizaliteInfos()
     
     vrInfo.name = "VarianceReport"
     vrInfo.codeColID = 1
-    vrInfo.internalColId = 2
-    vrInfo.desColID = 3
-    vrInfo.priceColID = 4
-    vrInfo.valueColID = 5
-    vrInfo.qtyColId = 6
-    vrInfo.invOnShopColId = 7
-    vrInfo.varianceColId = 8
+    vrInfo.desColID = 2
+    vrInfo.itemColId = 3
+    vrInfo.qtyColId = 4
+    vrInfo.invOnShopColId = 5
+    vrInfo.varianceColId = 6
+    vrInfo.reCountColId = 7
+
+    
+    mfInfo.name = "MasterFile"
+    mfInfo.codeColID = 1
+    mfInfo.desColID = 2
+    mfInfo.priceColID = 3
+    mfInfo.qtyColId = 4
+    mfInfo.locationColId = 5
 End Sub
 
 ' Entry point
@@ -117,7 +139,6 @@ End Sub
 Function Import() As Boolean
     Dim ret As Boolean
     
-    'ret = ImportSheetFromFile(1, fcsInfo.name, "Select Shop file")
     ret = ImportSheetFromTextFile(fcsInfo.name, "Select Shop file")
 
     If ret = False Then
@@ -130,6 +151,15 @@ Function Import() As Boolean
 
     If ret = False Then
         ' import of InventoryOnHand failed
+        Import = False
+        Exit Function
+    End If
+    
+    
+    ret = ImportSheetFromFile(1, mfInfo.name, "Select Master file")
+
+    If ret = False Then
+        ' import of master file failed
         Import = False
         Exit Function
     End If
@@ -170,6 +200,7 @@ Sub SanitizeAll()
     Sheets("Sheet1").name = vrInfo.name
     SanitizeInventoryInHand
     SanitizeFirstCountShop
+    SanitizeMasterFile
 End Sub
 
 
@@ -188,6 +219,20 @@ Sub SanitizeInventoryInHand()
     Sheets(iohInfo.name).Range("1:6").Delete
 End Sub
 
+
+' Remove the swapped column
+'
+Sub SanitizeMasterFile()
+    Dim mfWS As Worksheet
+    
+    Set mfWS = Sheets(mfInfo.name)
+    
+    For r = mfWS.UsedRange.Rows.count To 2 Step -1
+        If Not IsNumeric(mfWS.Cells(r, mfInfo.codeColID)) Then
+            mfWS.Rows(r).EntireRow.Delete
+        End If
+    Next
+End Sub
 
 
 ' Todo : Add a description
@@ -276,33 +321,38 @@ End Function
 ' import data from InventoryOnHand to VarianceReport
 '
 Sub BuildVarianceReport()
-    Dim inventoryWS, vReportWS As Worksheet
+    Dim masterWS, vReportWS As Worksheet
     
-    Set inventoryWS = Sheets(iohInfo.name)
+    Set masterWS = Sheets(mfInfo.name)
     Set vReportWS = Sheets(vrInfo.name)
     ' Copy selected columns to VarianceReport Sheet
-    inventoryWS.Columns(iohInfo.codeColID).Copy Destination:=vReportWS.Columns(vrInfo.codeColID)
-    inventoryWS.Columns(iohInfo.internalColId).Copy Destination:=vReportWS.Columns(vrInfo.internalColId)
-    inventoryWS.Columns(iohInfo.desColID).Copy Destination:=vReportWS.Columns(vrInfo.desColID)
-    inventoryWS.Columns(iohInfo.priceColID).Copy Destination:=vReportWS.Columns(vrInfo.priceColID)
-    inventoryWS.Columns(iohInfo.valueColID).Copy Destination:=vReportWS.Columns(vrInfo.valueColID)
-    inventoryWS.Columns(iohInfo.qtyColId).Copy Destination:=vReportWS.Columns(vrInfo.qtyColId)
+    
+        
+    masterWS.Columns(mfInfo.codeColID).Copy Destination:=vReportWS.Columns(vrInfo.codeColID)
+    masterWS.Columns(mfInfo.desColID).Copy Destination:=vReportWS.Columns(vrInfo.desColID)
 
-    vReportWS.Cells(1, vrInfo.invOnShopColId).Value = "Inv On Shop"
-    vReportWS.Cells(1, vrInfo.varianceColId).Value = "Variance"
     
-    CreateVLookup
+    vReportWS.Cells(1, vrInfo.itemColId) = "Item"
+    vReportWS.Cells(1, vrInfo.qtyColId) = "NetSuite"
+    vReportWS.Cells(1, vrInfo.invOnShopColId) = "Count"
+    vReportWS.Cells(1, vrInfo.varianceColId) = "Variance"
+    vReportWS.Cells(1, vrInfo.reCountColId) = "ReCount"
+    
+    ImportItemsFromInventoryOnHand
+    importNetSuiteFromInventoryOnHand
+    ImportCountFromFirstCountShop
     ComputeVarianceValue
-    
+
+
     ' Apply filter
     vReportWS.AutoFilterMode = False
-    vReportWS.Range("A:H").AutoFilter Field:=8, Criteria1:="<>0", VisibleDropDown:=True
-    
+    vReportWS.Range("A:G").AutoFilter Field:=6, Criteria1:="<>0", VisibleDropDown:=True
+
     ' Now, resize columns to AutoFit size
     For C = 1 To vReportWS.UsedRange.Columns.count
         vReportWS.Columns(C).AutoFit
     Next
-    
+
     With vReportWS.Range(vReportWS.Cells(2, vrInfo.varianceColId), vReportWS.Cells(2, vrInfo.varianceColId).End(xlDown))
         .FormatConditions.Delete
         .FormatConditions.Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=0"
@@ -313,9 +363,44 @@ Sub BuildVarianceReport()
 End Sub
 
 
+Sub ImportItemsFromInventoryOnHand()
+    Dim iohWS, vReportWS As Worksheet
+    Dim nbRows As Integer
+    
+    Set iohWS = Sheets(iohInfo.name)
+    Set vReportWS = Sheets(vrInfo.name)
+    
+    nbRows = iohWS.UsedRange.Rows.count + 50  'add margin
+    lookupFormula = "VLOOKUP(RC[-2]," & iohWS.name & "!R2C1:R" & nbRows & "C5, 5, False)"
+    errorMsg = "Not Found"
+    For r = 2 To vReportWS.UsedRange.Rows.count
+        form = "=IFERROR(" & lookupFormula & "," & Chr(34) & errorMsg & Chr(34) & ")"
+        vReportWS.Cells(r, vrInfo.itemColId).FormulaR1C1 = form
+    Next
+End Sub
+
+
+Sub importNetSuiteFromInventoryOnHand()
+    Dim iohWS, vReportWS As Worksheet
+    Dim nbRows As Integer
+    
+    Set iohWS = Sheets(iohInfo.name)
+    Set vReportWS = Sheets(vrInfo.name)
+    
+    nbRows = iohWS.UsedRange.Rows.count + 50  'add margin
+    lookupFormula = "VLOOKUP(RC[-3]," & iohWS.name & "!R2C1:R" & nbRows & "C8, 8, False)"
+    errorMsg = "Not Found"
+    For r = 2 To vReportWS.UsedRange.Rows.count
+        form = "=IFERROR(" & lookupFormula & "," & Chr(34) & errorMsg & Chr(34) & ")"
+        vReportWS.Cells(r, vrInfo.qtyColId).FormulaR1C1 = form
+    Next
+End Sub
+
+
+
 ' Create the VLookup to retrieve information from the first count shop
 '
-Sub CreateVLookup()
+Sub ImportCountFromFirstCountShop()
     Dim firstShopWS, vReportWS As Worksheet
     Dim nbRowsInFsc As Integer
     
@@ -323,10 +408,10 @@ Sub CreateVLookup()
     Set vReportWS = Sheets(vrInfo.name)
     
     nbRowsInFsc = firstShopWS.UsedRange.Rows.count + 50  'add margin
-    lookupFormula = "VLOOKUP(RC[-6]," & fcsInfo.name & "!R2C2:R" & nbRowsInFsc & "C5, 4, False)"
-    errorMsg = "Not Found"
+    lookupFormula = "VLOOKUP(RC[-4]," & fcsInfo.name & "!R2C2:R" & nbRowsInFsc & "C5, 4, False)"
+    errorMsg = "0"
     For r = 2 To vReportWS.UsedRange.Rows.count
-        form = "=IFERROR(" & lookupFormula & "," & Chr(34) & errorMsg & Chr(34) & ")"
+        form = "=IFERROR(" & lookupFormula & "," & errorMsg & ")"
         vReportWS.Cells(r, vrInfo.invOnShopColId).FormulaR1C1 = form
     Next
 End Sub
@@ -353,6 +438,7 @@ Sub Reset()
     On Error Resume Next
     ThisWorkbook.Sheets(fcsInfo.name).Delete
     ThisWorkbook.Sheets(iohInfo.name).Delete
+    ThisWorkbook.Sheets(mfInfo.name).Delete
     ThisWorkbook.Sheets(vrInfo.name).AutoFilterMode = False
     ThisWorkbook.Sheets(vrInfo.name).UsedRange.ClearContents
     ThisWorkbook.Sheets(vrInfo.name).name = "Sheet1"
