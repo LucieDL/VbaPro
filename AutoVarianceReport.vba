@@ -81,6 +81,7 @@ End Sub
 '
 Sub Main()
     InitizaliteInfos
+    Application.ScreenUpdating = False
     
     If SheetExists(vrInfo.name) Then
         If MsgBox("Delete current report and create a new one?", vbYesNo, "Confirm") = vbYes Then
@@ -93,6 +94,7 @@ Sub Main()
     ' Step 1:
     '  import FirstCountFile and InventoryOnHand
     If Import = False Then
+        Debug.Print "Import Failed"
         Exit Sub
     End If
     
@@ -106,6 +108,7 @@ Sub Main()
     ' Step 3:
     ' Compute variance
     BuildVarianceReport
+    Application.ScreenUpdating = True
 End Sub
 
 
@@ -114,7 +117,8 @@ End Sub
 Function Import() As Boolean
     Dim ret As Boolean
     
-    ret = ImportSheetFromFile(1, fcsInfo.name, "Select Shop file")
+    'ret = ImportSheetFromFile(1, fcsInfo.name, "Select Shop file")
+    ret = ImportSheetFromTextFile(fcsInfo.name, "Select Shop file")
 
     If ret = False Then
         ' import of first count shop failed
@@ -367,4 +371,48 @@ Function SheetExists(name As String) As Boolean
       Exit Function
     End If
   Next WS
+End Function
+
+
+
+Sub test()
+    InitizaliteInfos
+    ImportFirstCountTextFile
+End Sub
+
+
+Function ImportSheetFromTextFile(name As String, caption As String) As Boolean
+    Dim i, j As Integer
+    Dim fd As Integer: fd = FreeFile
+    Dim filter As String
+    Dim selectedFilename As Variant
+    Dim lines() As String
+    
+    filter = "Text Files (*.txt),*.txt"
+    selectedFilename = Application.GetOpenFilename(filter, , caption)
+    
+    If selectedFilename = False Then
+        ' No file selected
+        ImportFirstCountTextFile = False
+        Exit Function
+    End If
+    
+    Dim newWS As Worksheet
+    Set newWS = Sheets.Add
+    newWS.name = name
+    
+    
+    Open selectedFilename For Input As #fd
+        lines = Split(Input$(LOF(fd), #fd), vbNewLine)
+    Close #fd
+    
+    For i = 0 To UBound(lines)
+        Dim arr
+        arr = Split(lines(i), vbTab)
+        For j = 0 To UBound(arr)
+            newWS.Cells(i + 1, j + 1).Value = arr(j)
+        Next
+    Next
+    
+    ImportSheetFromTextFile = True
 End Function
