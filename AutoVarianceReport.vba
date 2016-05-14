@@ -14,9 +14,13 @@ Type InventoryOnHandInfo
     codeColID As Integer
     internalColId As Integer
     desColID As Integer
+    itemTypeColId As Integer
+    itemColId As Integer
     priceColID As Integer
     valueColID As Integer
     qtyColId As Integer
+    avgUnitCostColdId As Integer
+    invValueColId As Integer
 End Type
 
 ' Information related to first cunt shop file layout
@@ -68,35 +72,71 @@ Public mfInfo As MasterFileInfo
 ' This Mapping helps to refactor easly in case file format changes.
 Sub InitizaliteInfos()
     iohInfo.name = "InventoryOnHand"
-    iohInfo.codeColID = 1
-    iohInfo.internalColId = 2
-    iohInfo.desColID = 3
-    iohInfo.priceColID = 6
-    iohInfo.valueColID = 7
-    iohInfo.qtyColId = 8
+    With iohInfo
+        .codeColID = 1
+        .internalColId = 2
+        .desColID = 3
+        .itemTypeColId = 4
+        .itemColId = 5
+        .priceColID = 6
+        .valueColID = 7
+        .qtyColId = 8
+        .avgUnitCostColdId = 9
+        .invValueColId = 10
+    End With
     
     fcsInfo.name = "FirstCountShop"
-    fcsInfo.codeColID = 2
-    fcsInfo.descColID = 3
-    fcsInfo.qtyColId = 5
-    
-    vrInfo.name = "VarianceReport"
-    vrInfo.codeColID = 1
-    vrInfo.desColID = 2
-    vrInfo.itemColId = 3
-    vrInfo.qtyColId = 4
-    vrInfo.invOnShopColId = 5
-    vrInfo.varianceColId = 6
-    vrInfo.reCountColId = 7
+    With fcsInfo
+        .codeColID = 2
+        .descColID = 3
+        .qtyColId = 5
+    End With
 
-    
+    vrInfo.name = "VarianceReport"
+    With vrInfo
+        .codeColID = 1
+        .desColID = 2
+        .itemColId = 3
+        .qtyColId = 4
+        .invOnShopColId = 5
+        .varianceColId = 6
+        .reCountColId = 7
+    End With
+
     mfInfo.name = "MasterFile"
-    mfInfo.codeColID = 1
-    mfInfo.desColID = 2
-    mfInfo.priceColID = 3
-    mfInfo.qtyColId = 4
-    mfInfo.locationColId = 5
+    With mfInfo
+        .codeColID = 1
+        .desColID = 2
+        .priceColID = 3
+        .qtyColId = 4
+        .locationColId = 5
+    End With
 End Sub
+
+
+' Verify that the given sheet name matches the expected layout
+'
+' sheetName : the name of the sheet to inspect
+' layout : a string that contains coma separated column names. e.g "code,descirption,price"
+Function VerifyLayout(sheetName As String, layout As String) As Boolean
+    Dim ws As Worksheet
+    Dim expectedLayout() As String: expectedLayout = Split(layout, ",")
+
+    Set ws = Sheets(sheetName)
+
+    For i = 0 To UBound(expectedLayout)
+        Debug.Print ws.Cells(1, i + 1).Text
+        If StrComp(UCase(Trim(ws.Cells(1, i + 1))), UCase(Trim(expectedLayout(i)))) <> 0 Then
+        'If ws.Cells(1, i).Text <> expectedLayout(i) Then
+            Debug.Print "Invalid format for " & sheetName; ": expecting " & expectedLayout(i) & " in column " & i + 1 & " but found " & ws.Cells(1, i + 1) & " instead."
+            VerifyLayout = False
+            Exit Function
+        End If
+    Next
+
+    VerifyLayout = True
+End Function
+
 
 ' Entry point
 ' Select this function as the Macro entry point
@@ -146,16 +186,35 @@ Function Import() As Boolean
         Import = False
         Exit Function
     End If
-    
-    ret = ImportSheetFromFile(1, iohInfo.name, "Select InventoryOnHand")
+
+    ret = VerifyLayout(fcsInfo.name, "Location,Code,Description,System Price,Quantity,Value,System Quantity,Variance,Variance Value")
+
+    If ret = False Then
+        ' import of first does not match expected layout
+        Import = False
+        Exit Function
+    End If
+
+    ret = ImportSheetFromFile(1, iohInfo.name, "Select Inventory On Hand file")
 
     If ret = False Then
         ' import of InventoryOnHand failed
         Import = False
         Exit Function
     End If
-    
-    
+
+    ' Sanitizing Inventory On Hand right after Import
+    ' So you can verify layout.
+    ' subsequent sanitize should be done in SanitizeAll
+    SanitizeInventoryInHand
+    ret = VerifyLayout(iohInfo.name, "UPC Code,Internal ID,Display Name,Item Type,Item,Sales Price,Retail Value,Inv On Hand,Avg Unit Cost,Inv. Value")
+
+    If ret = False Then
+        ' import of inventory on hand does not match expected layout
+        Import = False
+        Exit Function
+    End If
+
     ret = ImportSheetFromFile(1, mfInfo.name, "Select Master file")
 
     If ret = False Then
@@ -163,7 +222,16 @@ Function Import() As Boolean
         Import = False
         Exit Function
     End If
-    
+
+
+    ret = VerifyLayout(mfInfo.name, "UPC Code,Display Name,Sales Price,Inv On Hand,Location")
+
+    If ret = False Then
+        ' import of inventory on hand does not match expected layout
+        Import = False
+        Exit Function
+    End If
+
     Import = True
 End Function
 
@@ -198,7 +266,8 @@ End Function
 '
 Sub SanitizeAll()
     Sheets("Sheet1").name = vrInfo.name
-    SanitizeInventoryInHand
+    ' Sanitizing Inventory On Hand right after Import
+    ' So you can verify layout.
     SanitizeFirstCountShop
     SanitizeMasterFile
 End Sub
@@ -224,9 +293,9 @@ End Sub
 '
 Sub SanitizeMasterFile()
     Dim mfWS As Worksheet
-    
+
     Set mfWS = Sheets(mfInfo.name)
-    
+
     For r = mfWS.UsedRange.Rows.count To 2 Step -1
         If Not IsNumeric(mfWS.Cells(r, mfInfo.codeColID)) Then
             mfWS.Rows(r).EntireRow.Delete
@@ -451,20 +520,13 @@ End Sub
 '
 Function SheetExists(name As String) As Boolean
   SheetExists = False
-  For Each WS In Worksheets
-    If name = WS.name Then
+  For Each ws In Worksheets
+    If name = ws.name Then
       SheetExists = True
       Exit Function
     End If
-  Next WS
+  Next ws
 End Function
-
-
-
-Sub test()
-    InitizaliteInfos
-    ImportFirstCountTextFile
-End Sub
 
 
 Function ImportSheetFromTextFile(name As String, caption As String) As Boolean
