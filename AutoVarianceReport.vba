@@ -125,10 +125,10 @@ Function VerifyLayout(sheetName As String, layout As String) As Boolean
     Set ws = Sheets(sheetName)
 
     For i = 0 To UBound(expectedLayout)
-        Debug.Print ws.Cells(1, i + 1).Text
-        If StrComp(UCase(Trim(ws.Cells(1, i + 1))), UCase(Trim(expectedLayout(i)))) <> 0 Then
-        'If ws.Cells(1, i).Text <> expectedLayout(i) Then
-            Debug.Print "Invalid format for " & sheetName; ": expecting " & expectedLayout(i) & " in column " & i + 1 & " but found " & ws.Cells(1, i + 1) & " instead."
+        If StrComp(UCase(Trim(Application.Clean(ws.Cells(1, i + 1)))), UCase(Trim(expectedLayout(i)))) <> 0 Then
+            Dim msg As String
+            msg = "Invalid format for " & sheetName & ": expecting " & expectedLayout(i) & " in column " & i + 1 & " but found " & ws.Cells(1, i + 1) & " instead."
+            MsgBox msg
             VerifyLayout = False
             Exit Function
         End If
@@ -157,6 +157,7 @@ Sub Main()
     '  import FirstCountFile and InventoryOnHand
     If Import = False Then
         Debug.Print "Import Failed"
+        Reset
         Exit Sub
     End If
     
@@ -179,7 +180,8 @@ End Sub
 Function Import() As Boolean
     Dim ret As Boolean
     
-    ret = ImportSheetFromTextFile(fcsInfo.name, "Select Shop file")
+    ' Shop file is a tab separated text file (AKA TSV)
+    ret = ImportSheetFromTextFile(fcsInfo.name, "Select Shop file", vbTab, "Text Files (*.txt),*.txt", vbNewLine)
 
     If ret = False Then
         ' import of first count shop failed
@@ -195,7 +197,8 @@ Function Import() As Boolean
         Exit Function
     End If
 
-    ret = ImportSheetFromFile(1, iohInfo.name, "Select Inventory On Hand file")
+    ' Inventory on hand is a coma separated text file (Coma Separated Values AKA CSV)
+    ret = ImportSheetFromTextFile(iohInfo.name, "Select Inventory On Hand file", ",", "CSV Files (*.csv),*.csv", Chr(10))
 
     If ret = False Then
         ' import of InventoryOnHand failed
@@ -460,7 +463,7 @@ Sub importNetSuiteFromInventoryOnHand()
     lookupFormula = "VLOOKUP(RC[-3]," & iohWS.name & "!R2C1:R" & nbRows & "C8, 8, False)"
     errorMsg = "Not Found"
     For r = 2 To vReportWS.UsedRange.Rows.count
-        form = "=IFERROR(" & lookupFormula & "," & Chr(34) & errorMsg & Chr(34) & ")"
+        form = "=IFERROR(" & lookupFormula & "," & 0 & ")"
         vReportWS.Cells(r, vrInfo.qtyColId).FormulaR1C1 = form
     Next
 End Sub
@@ -529,14 +532,12 @@ Function SheetExists(name As String) As Boolean
 End Function
 
 
-Function ImportSheetFromTextFile(name As String, caption As String) As Boolean
+Function ImportSheetFromTextFile(name As String, caption As String, delimiter As String, filter As String, lineBreak As String) As Boolean
     Dim i, j As Integer
     Dim fd As Integer: fd = FreeFile
-    Dim filter As String
     Dim selectedFilename As Variant
     Dim lines() As String
     
-    filter = "Text Files (*.txt),*.txt"
     selectedFilename = Application.GetOpenFilename(filter, , caption)
     
     If selectedFilename = False Then
@@ -549,14 +550,16 @@ Function ImportSheetFromTextFile(name As String, caption As String) As Boolean
     Set newWS = Sheets.Add
     newWS.name = name
     
-    
+    ' Load the file in memory
     Open selectedFilename For Input As #fd
-        lines = Split(Input$(LOF(fd), #fd), vbNewLine)
+        lines = Split(Input$(LOF(fd), #fd), lineBreak)
     Close #fd
     
+    ' iterate over each line, split after delimiter, and create the row
     For i = 0 To UBound(lines)
         Dim arr
-        arr = Split(lines(i), vbTab)
+        arr = Split(lines(i), delimiter)
+        Debug.Print lines(i)
         For j = 0 To UBound(arr)
             newWS.Cells(i + 1, j + 1).Value = arr(j)
         Next
